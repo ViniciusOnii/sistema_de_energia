@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Energia</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container my-4">
+        <h1 class="text-center">Sistema de Energia</h1>
+        <div class="row">
+            <div class="col-md-6">
+                <h4>Consumo Atual</h4>
+                <ul class="list-group">
+                    <li class="list-group-item">Consumo Total: <span id="total-consumption">0</span> kWh</li>
+                    <li class="list-group-item">Fonte Atual: <span id="current-source">Companhia Elétrica</span></li>
+                </ul>
+                <button id="start-btn" class="btn btn-success mt-3">Iniciar Simulação</button>
+                <button id="stop-btn" class="btn btn-danger mt-3">Parar Simulação</button>
+            </div>
+            <div class="col-md-6">
+                <h4>Atualizar Tarifas</h4>
+                <div class="input-group mb-3">
+                    <span class="input-group-text">Tarifa Companhia (R$/kWh)</span>
+                    <input type="number" class="form-control" id="company-rate" step="0.01">
+                </div>
+                <div class="input-group mb-3">
+                    <span class="input-group-text">Tarifa Solar (R$/kWh)</span>
+                    <input type="number" class="form-control" id="solar-rate" step="0.01">
+                </div>
+                <button id="update-rates-btn" class="btn btn-primary">Atualizar Tarifas</button>
+            </div>
+        </div>
+        <hr>
+        <div>
+            <h4>Adicionar Dispositivo</h4>
+            <div class="input-group mb-3">
+                <span class="input-group-text">Nome</span>
+                <input type="text" class="form-control" id="device-name">
+                <span class="input-group-text">Potência (W)</span>
+                <input type="number" class="form-control" id="device-power" step="1">
+                <span class="input-group-text">Horas de Uso</span>
+                <input type="number" class="form-control" id="device-hours" step="1">
+            </div>
+            <button id="add-device-btn" class="btn btn-success">Adicionar Dispositivo</button>
+        </div>
+        <hr>
+        <div>
+            <h4>Dispositivos</h4>
+            <ul id="device-list" class="list-group"></ul>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const totalConsumption = document.getElementById("total-consumption");
+            const currentSource = document.getElementById("current-source");
+            const deviceList = document.getElementById("device-list");
+            const startBtn = document.getElementById("start-btn");
+            const stopBtn = document.getElementById("stop-btn");
+            const updateRatesBtn = document.getElementById("update-rates-btn");
+            const addDeviceBtn = document.getElementById("add-device-btn");
+
+            const companyRateInput = document.getElementById("company-rate");
+            const solarRateInput = document.getElementById("solar-rate");
+            const deviceNameInput = document.getElementById("device-name");
+            const devicePowerInput = document.getElementById("device-power");
+            const deviceHoursInput = document.getElementById("device-hours");
+
+            const fetchData = () => {
+                fetch("/api/get_data")
+                    .then(response => response.json())
+                    .then(data => {
+                        totalConsumption.textContent = data.total_consumption.toFixed(2);
+                        currentSource.textContent = data.current_source;
+
+                        deviceList.innerHTML = "";
+                        data.devices.forEach(device => {
+                            const li = document.createElement("li");
+                            li.className = "list-group-item d-flex justify-content-between align-items-center";
+                            li.textContent = `${device.name} - ${device.power}W - ${device.usage_hours}h`;
+
+                            const removeBtn = document.createElement("button");
+                            removeBtn.className = "btn btn-danger btn-sm";
+                            removeBtn.textContent = "Remover";
+                            removeBtn.onclick = () => removeDevice(device.name);
+
+                            li.appendChild(removeBtn);
+                            deviceList.appendChild(li);
+                        });
+                    })
+                    .catch(err => console.error("Erro ao buscar dados:", err));
+            };
+
+            const updateRates = () => {
+                const companyRate = parseFloat(companyRateInput.value);
+                const solarRate = parseFloat(solarRateInput.value);
+
+                fetch("/api/update_rates", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ company_rate: companyRate, solar_rate: solarRate }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                    })
+                    .catch(err => console.error("Erro ao atualizar tarifas:", err));
+            };
+
+            const addDevice = () => {
+                const name = deviceNameInput.value;
+                const power = parseFloat(devicePowerInput.value);
+                const usageHours = parseFloat(deviceHoursInput.value);
+
+                fetch("/api/add_device", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, power, usage_hours: usageHours }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        fetchData();
+                    })
+                    .catch(err => console.error("Erro ao adicionar dispositivo:", err));
+            };
+
+            const removeDevice = (name) => {
+                fetch("/api/remove_device", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        fetchData();
+                    })
+                    .catch(err => console.error("Erro ao remover dispositivo:", err));
+            };
+
+            const startSimulation = () => {
+                fetch("/api/start", { method: "POST" })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                    })
+                    .catch(err => console.error("Erro ao iniciar simulação:", err));
+            };
+
+            const stopSimulation = () => {
+                fetch("/api/stop", { method: "POST" })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                    })
+                    .catch(err => console.error("Erro ao parar simulação:", err));
+            };
+
+            updateRatesBtn.addEventListener("click", updateRates);
+            addDeviceBtn.addEventListener("click", addDevice);
+            startBtn.addEventListener("click", startSimulation);
+            stopBtn.addEventListener("click", stopSimulation);
+
+            setInterval(fetchData, 2000); // Atualiza os dados a cada 2 segundos
+        });
+    </script>
+</body>
+</html>
